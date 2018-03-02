@@ -112,7 +112,11 @@ defmodule KitchenSink.Algorithms do
     strategy
   ) when is_function(fit) and is_list(range_start_list) and is_list(range_finish_list) do
     {start_list, finish_list} = ensure_order(range_start_list, range_finish_list)
-    do_binary_search(start_list, finish_list, fit, target, strategy)
+    combined_list =
+      [start_list, finish_list]
+      |> Enum.zip()
+      |> Enum.map(fn {start, finish} -> {start, finish, :asc} end)
+    do_binary_search(combined_list, fit, target, strategy)
   end
   def binary_search(range_start, range_finish, fit, target, strategy) when is_function(fit) do
     binary_search([range_start], [range_finish], fit, target, strategy)
@@ -134,24 +138,65 @@ defmodule KitchenSink.Algorithms do
     {start ++ final_start, finish ++ final_finish}
   end
 
-  defp do_binary_search(list_start, list_end, fit, target, :midpoint) do
-    do_binary_search(list_start, list_end, fit, target, &binary_search_midpoint/2)
+  defp do_binary_search(list, fit, target, :midpoint) do
+    do_binary_search(list, fit, target, &binary_search_midpoint/1)
   end
-  defp do_binary_search(list_start, list_end, fit, target, :interval) do
-    do_binary_search(list_start, list_end, fit, target, &binary_search_interval/2)
+  defp do_binary_search(list, fit, target, :interval) do
+    do_binary_search(list, fit, target, &binary_search_interval/1)
   end
-  defp do_binary_search(position, position, fit, target, _), do: ok_or_not_found(position, fit, target)
-  defp do_binary_search(list_start, list_end, fit, target, strategy) when is_function(strategy) do
-    {{a, b}, list_mid, {c, d}} = strategy.(list_start, list_end)
+  defp do_binary_search([{position, position, _}], fit, target, _), do: ok_or_not_found(position, fit, target)
+  defp do_binary_search(list, fit, target, strategy) when is_function(strategy) do
+    IO.inspect(list, label: :pre_strategy)
+    list_mid = strategy.(list)
+    IO.inspect(list_mid, label: :post_strategy)
     # Maintain backward-compatibility
     mid_fit_check = if Kernel.length(list_mid) === 1, do: List.first(list_mid), else: list_mid
     case fit.(mid_fit_check, target) do
       :ok -> {:ok, mid_fit_check}
-      :high -> do_binary_search(c, d, fit, target, strategy)
-      :low -> do_binary_search(a, b, fit, target, strategy)
+      :high -> do_binary_search(list, fit, target, strategy)
+      :low -> do_binary_search(list, fit, target, strategy)
     end
   end
 
+  defp direction({start, mid, finish, direction}) when direction == :asc do
+    {bounded_increment(mid, finish), finish, direction}
+  end
+  defp direction({start, mid, finish, direction}) when direction == :desc do
+    {start, bounded_increment(mid, start), direction}
+  end
+
+  defp binary_search_midpoint(range_tuples) do
+    IO.puts("midpoint")
+    range_tuples
+    |> Enum.map(fn {start, finish, direction} ->
+      mid_strategy = {start, start + div(finish - start, 2), finish, direction}
+      IO.inspect(mid_strategy, label: :mid_strategy)
+      direction({start, start + div(finish - start, 2), finish, direction})
+    end)
+    |> Enum.map(fn blob -> direction(blob) end)
+  end
+
+  defp binary_search_interval(range_tuples) do
+    IO.puts("interval")
+    range_tuples
+    |> Enum.map(fn {start, finish, direction} -> direction({start, start + (finish - start) / 2.0, finish, direction}) end)
+    |> Enum.map(fn blob -> direction(blob) end)
+  end
+
+  defp binary_search_midpoint(list_start, list_end, direction) do
+    list_mid =
+      list_start
+      |> Enum.zip(list_end)
+      |> Enum.map(fn {start, finish} -> start + div(finish - start, 2) end)
+
+    range_after_mid =
+      [list_start, list_mid, list_end, direction]
+      |> Enum.zip()
+      |> Enum.reduce(
+        {[], [], []}, fn blob, acc -> direction(blob, acc) end)
+
+      {range_before_mid, list_mid |> Enum.reverse(), range_after_mid, direction}
+  end
   defp binary_search_midpoint(list_start, list_end) do
     list_mid =
       list_start
