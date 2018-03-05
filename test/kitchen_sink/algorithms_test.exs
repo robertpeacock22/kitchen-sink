@@ -7,10 +7,11 @@ defmodule KitchenSink.AlgorithmsTest do
   doctest Algorithms
 
   def find_target(pos, desired_result) do
+    IO.inspect({pos, desired_result}, label: :fit_fn)
     cond do
-      pos < desired_result -> :high
-      pos == desired_result -> :ok
-      pos > desired_result -> :low
+      pos < desired_result -> :high |> IO.inspect()
+      pos == desired_result -> :ok |> IO.inspect()
+      pos > desired_result -> :low |> IO.inspect()
     end
   end
 

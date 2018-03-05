@@ -111,6 +111,8 @@ defmodule KitchenSink.Algorithms do
     target,
     strategy
   ) when is_function(fit) and is_list(range_start_list) and is_list(range_finish_list) do
+    # IO.puts("A")
+    IO.inspect({range_start_list, range_finish_list}, label: :range_start_list, charlists: :as_list)
     {start_list, finish_list} = ensure_order(range_start_list, range_finish_list)
     combined_list =
       [start_list, finish_list]
@@ -119,6 +121,7 @@ defmodule KitchenSink.Algorithms do
     do_binary_search(combined_list, fit, target, strategy)
   end
   def binary_search(range_start, range_finish, fit, target, strategy) when is_function(fit) do
+    # IO.puts("B")
     binary_search([range_start], [range_finish], fit, target, strategy)
   end
 
@@ -144,18 +147,51 @@ defmodule KitchenSink.Algorithms do
   defp do_binary_search(list, fit, target, :interval) do
     do_binary_search(list, fit, target, &binary_search_interval/1)
   end
-  defp do_binary_search([{position, position, _}], fit, target, _), do: ok_or_not_found(position, fit, target)
   defp do_binary_search(list, fit, target, strategy) when is_function(strategy) do
-    IO.inspect(list, label: :pre_strategy)
+    if search_complete(list) do
+      values =
+      list
+      |> Enum.reduce([], fn {pos, pos, _}, acc -> [pos | acc] end)
+      ok_or_not_found(values, fit, target)
+    else
+      ok_or_direction(list, fit, target, strategy)
+    end
+  end
+
+  defp ok_or_direction(list, fit, target, strategy) do
+    # IO.inspect(list, label: :pre_strategy)
+    # Strategy - bisect the range(s)
     list_mid = strategy.(list)
-    IO.inspect(list_mid, label: :post_strategy)
-    # Maintain backward-compatibility
-    mid_fit_check = if Kernel.length(list_mid) === 1, do: List.first(list_mid), else: list_mid
+    # IO.inspect(list_mid, label: :post_strategy)
+
+    # Maintain backward-compatibility for single-range cases
+    mid_fit_check = mid_fit_check(list_mid)
+
+    # IO.inspect(mid_fit_check, label: :mid_fit_check)
+
+    # Check the bisected range(s) with the fit function
     case fit.(mid_fit_check, target) do
       :ok -> {:ok, mid_fit_check}
-      :high -> do_binary_search(list, fit, target, strategy)
-      :low -> do_binary_search(list, fit, target, strategy)
+      :high -> do_binary_search(process(list_mid), fit, target, strategy)
+      :low -> do_binary_search(process(list_mid), fit, target, strategy)
     end
+  end
+
+  defp mid_fit_check([{_, mid, _, _}]) do
+    mid
+  end
+  defp mid_fit_check(list) when is_list(list) do
+    list
+    |> Enum.reduce([], fn {_, mid, _, _}, acc -> [mid | acc] end)
+  end
+
+  defp process(list) do
+    Enum.map(list, fn range -> direction(range) end)
+  end
+
+  defp search_complete(list) do
+    list
+    |> Enum.reduce(false, fn {start, finish, _}, acc -> acc or start == finish end)
   end
 
   defp direction({start, mid, finish, direction}) when direction == :asc do
@@ -166,21 +202,20 @@ defmodule KitchenSink.Algorithms do
   end
 
   defp binary_search_midpoint(range_tuples) do
-    IO.puts("midpoint")
+    # IO.puts("midpoint")
     range_tuples
     |> Enum.map(fn {start, finish, direction} ->
       mid_strategy = {start, start + div(finish - start, 2), finish, direction}
       IO.inspect(mid_strategy, label: :mid_strategy)
-      direction({start, start + div(finish - start, 2), finish, direction})
+
+      {start, start + div(finish - start, 2), finish, direction}
     end)
-    |> Enum.map(fn blob -> direction(blob) end)
   end
 
   defp binary_search_interval(range_tuples) do
-    IO.puts("interval")
+    # IO.puts("interval")
     range_tuples
     |> Enum.map(fn {start, finish, direction} -> direction({start, start + (finish - start) / 2.0, finish, direction}) end)
-    |> Enum.map(fn blob -> direction(blob) end)
   end
 
   defp binary_search_midpoint(list_start, list_end, direction) do
@@ -245,6 +280,7 @@ defmodule KitchenSink.Algorithms do
 
   defp ok_or_not_found(list, fit, target) do
     # Maintain backward-compatibility
+    # IO.inspect(list, label: :list)
     fit_check = if Kernel.length(list) === 1, do: List.first(list), else: list
     case fit.(fit_check, target) do
       :ok -> {:ok, fit_check}
