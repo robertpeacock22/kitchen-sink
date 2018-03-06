@@ -173,11 +173,11 @@ defmodule KitchenSink.Algorithms do
     if search_complete(list) do
       values =
         list
-        |> Enum.reduce([], fn {pos, pos, _}, acc -> [pos | acc] end)
+        |> Enum.reduce([], fn {pos, pos, _}, acc -> acc ++ [pos] end)
 
-      ok_or_not_found(values, fit, target)
+      ok_or_not_found(values, fit, target) |> IO.inspect(label: :ok_or_not_found)
     else
-      ok_or_direction(list, fit, target, strategy)
+      ok_or_direction(list, fit, target, strategy) |> IO.inspect(label: :ok_or_direction)
     end
   end
 
@@ -190,6 +190,8 @@ defmodule KitchenSink.Algorithms do
     # Problem: We need to know the new direction (if any) in order to choose
     # the new ranges, but we need to use the strategy in order to choose the new ranges
     {result, list_mid} = strategy.(list, fit, target)
+
+    IO.inspect({result, list_mid}, label: :mid_direction)
 
     # At this point, each tuple should have its "next" range, since the strategy
     # is responsible for both finding the midpoint and finding the new range
